@@ -5,3 +5,4 @@ train_log*.csv
 best*.bin
 exp/
 nohup.out
+gradcheck_full
