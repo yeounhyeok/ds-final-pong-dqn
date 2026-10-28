@@ -10,10 +10,10 @@
 ```
 make                      # pong_dqn 빌드
 make gradcheck            # 역전파 수치 미분 검증 (double 빌드)
-./pong_dqn train 300000 1 # 학습 (steps, seed) -> best.bin
+./pong_dqn train 300000 1 # 학습 (steps, seed) -> best.bin, train_log.csv
 ./pong_dqn eval best.bin  # 평가
 ```
-환경변수: `LR`, `TSYNC`, `GAMMA`, `RB`(버퍼 크기), `DDQN`(0/1), `TAG`
+하이퍼파라미터는 `pong_dqn.c` 상단의 `#define`. 환경변수 기반 실험 스크립트(Double DQN 등)는 `experiments` 브랜치.
 
 ## 상태
 프로토타입. 득점 승률은 1000점 재평가 기준 85~97% (랜덤 3.8%). 상대는 고정 룰 기반이라 쉬운 환경이며,
