@@ -1,0 +1,7 @@
+pong_dqn
+pong_dqn_dbl
+*.log
+train_log*.csv
+best*.bin
+exp/
+nohup.out
