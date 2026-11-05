@@ -1,0 +1,9 @@
+FINAL tag=g0.95_h0.0_s2 gamma=0.95 hit_r=0.00 seed=2  final_win=0.7674 final_hits=2.96  best_eval=0.929
+FINAL tag=g0.95_h0.3_s1 gamma=0.95 hit_r=0.30 seed=1  final_win=0.9314 final_hits=4.32  best_eval=0.936
+FINAL tag=g0.95_h0.0_s1 gamma=0.95 hit_r=0.00 seed=1  final_win=0.7152 final_hits=4.97  best_eval=0.900
+FINAL tag=g0.99_h0.0_s2 gamma=0.99 hit_r=0.00 seed=2  final_win=0.6856 final_hits=3.99  best_eval=0.964
+FINAL tag=g0.99_h0.0_s1 gamma=0.99 hit_r=0.00 seed=1  final_win=0.6580 final_hits=4.20  best_eval=0.893
+FINAL tag=g0.99_h0.3_s2 gamma=0.99 hit_r=0.30 seed=2  final_win=0.7048 final_hits=3.48  best_eval=0.990
+FINAL tag=g0.95_h0.3_s2 gamma=0.95 hit_r=0.30 seed=2  final_win=0.8574 final_hits=6.44  best_eval=0.903
+FINAL tag=g0.99_h0.3_s1 gamma=0.99 hit_r=0.30 seed=1  final_win=0.7648 final_hits=3.89  best_eval=0.974
+ALLDONE

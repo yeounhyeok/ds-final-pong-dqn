@@ -1,0 +1,7 @@
+FINAL tag=SH03P_s1 shape=0.3 lr=0.0003 sync=1000 ddqn=0 in=7 steps=300000 gamma=0.95 hit_r=0.30 seed=1  final_win=0.9958 final_hits=4.35  best_eval=1.002
+FINAL tag=SH03P_s2 shape=0.3 lr=0.0003 sync=1000 ddqn=0 in=7 steps=300000 gamma=0.95 hit_r=0.30 seed=2  final_win=0.9322 final_hits=5.16  best_eval=1.004
+FINAL tag=SH10P_s2 shape=1 lr=0.0003 sync=1000 ddqn=0 in=7 steps=300000 gamma=0.95 hit_r=0.30 seed=2  final_win=0.7148 final_hits=3.89  best_eval=0.970
+FINAL tag=SH10P_s1 shape=1 lr=0.0003 sync=1000 ddqn=0 in=7 steps=300000 gamma=0.95 hit_r=0.30 seed=1  final_win=0.8690 final_hits=4.95  best_eval=0.991
+FINAL tag=SH10_s2 shape=1 lr=0.0003 sync=1000 ddqn=0 in=6 steps=300000 gamma=0.95 hit_r=0.30 seed=2  final_win=0.7718 final_hits=4.14  best_eval=0.965
+FINAL tag=SH10_s1 shape=1 lr=0.0003 sync=1000 ddqn=0 in=6 steps=300000 gamma=0.95 hit_r=0.30 seed=1  final_win=0.9024 final_hits=4.81  best_eval=1.005
+ALLDONE

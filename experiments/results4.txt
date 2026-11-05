@@ -1,0 +1,24 @@
+FINAL tag=K0.1P_s2 shape=0.1 lr=0.0003 sync=1000 ddqn=0 in=7 steps=300000 gamma=0.95 hit_r=0.30 seed=2  final_win=0.6548 final_hits=2.46  sel_win=0.9920
+FINAL tag=K0.1P_s1 shape=0.1 lr=0.0003 sync=1000 ddqn=0 in=7 steps=300000 gamma=0.95 hit_r=0.30 seed=1  final_win=0.7466 final_hits=4.34  sel_win=0.9970
+FINAL tag=K0.1P_s3 shape=0.1 lr=0.0003 sync=1000 ddqn=0 in=7 steps=300000 gamma=0.95 hit_r=0.30 seed=3  final_win=0.4886 final_hits=3.01  sel_win=0.9800
+FINAL tag=K0.1P_s4 shape=0.1 lr=0.0003 sync=1000 ddqn=0 in=7 steps=300000 gamma=0.95 hit_r=0.30 seed=4  final_win=0.8196 final_hits=4.52  sel_win=0.9230
+FINAL tag=K0.1P_s5 shape=0.1 lr=0.0003 sync=1000 ddqn=0 in=7 steps=300000 gamma=0.95 hit_r=0.30 seed=5  final_win=0.9622 final_hits=6.63  sel_win=0.9880
+FINAL tag=K0.2P_s1 shape=0.2 lr=0.0003 sync=1000 ddqn=0 in=7 steps=300000 gamma=0.95 hit_r=0.30 seed=1  final_win=0.9434 final_hits=5.73  sel_win=0.9700
+FINAL tag=K0.2P_s2 shape=0.2 lr=0.0003 sync=1000 ddqn=0 in=7 steps=300000 gamma=0.95 hit_r=0.30 seed=2  final_win=0.7348 final_hits=3.21  sel_win=0.9410
+FINAL tag=K0.2P_s3 shape=0.2 lr=0.0003 sync=1000 ddqn=0 in=7 steps=300000 gamma=0.95 hit_r=0.30 seed=3  final_win=0.7366 final_hits=3.60  sel_win=0.9720
+FINAL tag=K0.2P_s4 shape=0.2 lr=0.0003 sync=1000 ddqn=0 in=7 steps=300000 gamma=0.95 hit_r=0.30 seed=4  final_win=0.8232 final_hits=5.65  sel_win=0.9900
+FINAL tag=K0.2P_s5 shape=0.2 lr=0.0003 sync=1000 ddqn=0 in=7 steps=300000 gamma=0.95 hit_r=0.30 seed=5  final_win=0.9606 final_hits=5.57  sel_win=0.9900
+FINAL tag=K0.5P_s1 shape=0.5 lr=0.0003 sync=1000 ddqn=0 in=7 steps=300000 gamma=0.95 hit_r=0.30 seed=1  final_win=0.8994 final_hits=6.24  sel_win=0.9780
+FINAL tag=K0.5P_s2 shape=0.5 lr=0.0003 sync=1000 ddqn=0 in=7 steps=300000 gamma=0.95 hit_r=0.30 seed=2  final_win=0.9728 final_hits=3.42  sel_win=0.9830
+FINAL tag=K0.5P_s4 shape=0.5 lr=0.0003 sync=1000 ddqn=0 in=7 steps=300000 gamma=0.95 hit_r=0.30 seed=4  final_win=0.7896 final_hits=3.52  sel_win=0.9870
+FINAL tag=K0.5P_s3 shape=0.5 lr=0.0003 sync=1000 ddqn=0 in=7 steps=300000 gamma=0.95 hit_r=0.30 seed=3  final_win=0.9650 final_hits=5.24  sel_win=0.9580
+FINAL tag=K0.5P_s5 shape=0.5 lr=0.0003 sync=1000 ddqn=0 in=7 steps=300000 gamma=0.95 hit_r=0.30 seed=5  final_win=0.8968 final_hits=6.26  sel_win=0.9970
+FINAL tag=K0.3P_s3 shape=0.3 lr=0.0003 sync=1000 ddqn=0 in=7 steps=300000 gamma=0.95 hit_r=0.30 seed=3  final_win=0.9078 final_hits=3.74  sel_win=0.9570
+FINAL tag=K0.3P_s4 shape=0.3 lr=0.0003 sync=1000 ddqn=0 in=7 steps=300000 gamma=0.95 hit_r=0.30 seed=4  final_win=0.8340 final_hits=3.96  sel_win=0.9720
+FINAL tag=K0.3P_s5 shape=0.3 lr=0.0003 sync=1000 ddqn=0 in=7 steps=300000 gamma=0.95 hit_r=0.30 seed=5  final_win=0.9972 final_hits=4.01  sel_win=0.9970
+FINAL tag=K0.3I6_s1 shape=0.3 lr=0.0003 sync=1000 ddqn=0 in=6 steps=300000 gamma=0.95 hit_r=0.30 seed=1  final_win=0.7784 final_hits=5.66  sel_win=0.9130
+FINAL tag=K0.3I6_s2 shape=0.3 lr=0.0003 sync=1000 ddqn=0 in=6 steps=300000 gamma=0.95 hit_r=0.30 seed=2  final_win=0.8788 final_hits=8.36  sel_win=0.9720
+FINAL tag=K0.3I6_s3 shape=0.3 lr=0.0003 sync=1000 ddqn=0 in=6 steps=300000 gamma=0.95 hit_r=0.30 seed=3  final_win=0.9760 final_hits=4.06  sel_win=0.9750
+FINAL tag=K0.3I6_s4 shape=0.3 lr=0.0003 sync=1000 ddqn=0 in=6 steps=300000 gamma=0.95 hit_r=0.30 seed=4  final_win=0.9322 final_hits=4.58  sel_win=0.9650
+FINAL tag=K0.3I6_s5 shape=0.3 lr=0.0003 sync=1000 ddqn=0 in=6 steps=300000 gamma=0.95 hit_r=0.30 seed=5  final_win=0.9224 final_hits=5.79  sel_win=0.9510
+ALLDONE
