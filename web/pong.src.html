@@ -3,6 +3,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
 <title>Pong DQN — 신경망과 대전</title>
 <style>
+ .card{margin-top:12px;background:#0d1320;border:1px solid #28344d;border-radius:10px;padding:8px 10px}
+ .card summary{cursor:pointer;font-size:14px;font-weight:600;padding:2px 0}
+ .card canvas{border:0;background:#05080e;margin-top:6px}
+ .sub{font-size:12px;color:#8a97b0;line-height:1.55;margin:4px 0}
  html,body{margin:0;height:100%;background:#0b0f17;color:#dfe6f2;font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif;touch-action:none;-webkit-user-select:none;user-select:none}
  #wrap{max-width:900px;margin:0 auto;padding:10px;box-sizing:border-box}
  h1{font-size:17px;margin:4px 0 8px;font-weight:600}
@@ -15,15 +19,29 @@
  @media (pointer:coarse){#pad{display:flex}}
  #note{font-size:12px;color:#8a97b0;margin-top:8px;line-height:1.5}
 </style></head><body><div id="wrap">
-<h1>🏓 Pong DQN — 신경망(왼쪽)과 대전, 당신은 오른쪽</h1>
+<h1 id="ttl">🏓 Pong DQN — 신경망(왼쪽)과 대전, 당신은 오른쪽</h1>
 <div id="bar">
- 난이도
+ 모드
+ <button class="btn on" data-m="play">내가 플레이</button><button class="btn" data-m="spec">AI vs AI 관전</button>
+ <span id="lblL">난이도</span>
  <button class="btn" data-d="1">초급</button><button class="btn" data-d="2">중급</button><button class="btn on" data-d="3">고급</button>
- <button class="btn" id="start">시작 (Space)</button><span id="rank"></span>
+ <button class="btn" id="start">시작 (Space)</button>
+</div>
+<div id="bar2" style="display:none;margin-bottom:8px;font-size:14px;gap:8px;align-items:center;flex-wrap:wrap">
+ 오른쪽 AI 난이도
+ <button class="btn" data-r="1">초급</button><button class="btn" data-r="2">중급</button><button class="btn on" data-r="3">고급</button>
+ &nbsp;속도
+ <button class="btn on" data-s="1">1x</button><button class="btn" data-s="2">2x</button><button class="btn" data-s="4">4x</button>
 </div>
 <canvas id="c" width="900" height="520"></canvas>
+<details class="card" open><summary>🧠 신경망 실시간 (왼쪽 AI의 입력 → 은닉 64 → 은닉 64 → Q값)</summary>
+<canvas id="nn" width="900" height="335"></canvas>
+<div class="sub">셀 밝기 = 활성값(ReLU). 밝은 주황 = 강하게 켜짐, 검정 = 꺼짐(0). 입력 막대는 정규화된 관측값, 오른쪽은 세 행동의 Q값(가장 큰 것이 선택됨).</div></details>
+<details class="card"><summary>🔬 가중치 전체 (4,867개)</summary>
+<canvas id="wm" width="900" height="450"></canvas>
+<div class="sub" id="wstat"></div></details>
 <div id="pad"><button class="btn" id="up">▲</button><button class="btn" id="dn">▼</button></div>
-<div id="note">조작: <b>↑/↓</b> 또는 <b>W/S</b> — 누르는 동안 이동, 떼면 멈춤 · 모바일은 아래 ▲▼ 버튼 · 먼저 7점<br>
+<div id="note">조작: <b>↑/↓</b> 또는 <b>W/S</b> — 누르는 동안 이동, 떼면 멈춤 · 모바일은 아래 ▲▼ 버튼 · 먼저 7점 · <b>관전 모드</b>: 같은 모델이 양쪽을 조종(오른쪽은 화면을 좌우 반전해 입력, 양쪽 받아침 모두 4% 가속), 점수는 계속 누적, Space로 초기화<br>
 난이도는 같은 모델의 입력(공 착지 예측)에 오차 σ를 섞어 만듭니다 (초급 0.30 / 중급 0.15 / 고급 0). 규칙 기반 상대 대비 승률은 각각 약 29% / 69% / 99.9% 이며, 사람 상대 난이도는 측정하지 않았습니다.</div>
 </div>
 <script>__CORE__</script>
@@ -35,7 +53,8 @@ const cv = document.getElementById('c'), g = cv.getContext('2d'), W = cv.width, 
 const WIN = 7, TICK = 30, HSPEED = PADDLE_SPEED;   // 30ms/틱 = 터미널판과 동일, 사람 속도 = AI 속도
 const M = 18, PW = 14;                              // 좌우 여백, 패들 두께
 const rand = Math.random;
-let diff = 3, state = 'menu', e = envReset(rand), sa = 0, sh = 0, rally = 0, best = 0, msg = '', pauseUntil = 0, acc = 0, last = performance.now();
+let mode = 'play', diff = 3, diffR = 3, speed = 1, state = 'menu', e = envReset(rand), sa = 0, sh = 0, rally = 0, best = 0, msg = '', pauseUntil = 0, acc = 0, last = performance.now();
+const TR = {};
 let kUp = false, kDn = false, tUp = false, tDn = false;
 const ev = {};
 
@@ -51,7 +70,7 @@ function draw(){
   g.fillStyle = '#8fb8ff'; g.font = '600 34px system-ui'; g.textAlign = 'center';
   g.fillText(sa, W/2 - 60, 46); g.fillStyle = '#ffc77d'; g.fillText(sh, W/2 + 60, 46);
   g.font = '13px system-ui'; g.fillStyle = '#8a97b0';
-  g.fillText('AI (σ=' + SIGMA[diff].toFixed(2) + ')', W/4, 22); g.fillText('YOU', 3*W/4, 22);
+  g.fillText('AI (σ=' + SIGMA[diff].toFixed(2) + ')', W/4, 22); g.fillText(mode === 'spec' ? 'AI (σ=' + SIGMA[diffR].toFixed(2) + ')' : 'YOU', 3*W/4, 22);
   g.fillText('랠리 ' + rally + ' · 최고 ' + best, W/2, Hh - 12);
   if (msg) { g.fillStyle = '#fff'; g.font = '600 26px system-ui'; g.fillText(msg, W/2, Hh/2 - 10); }
 }
@@ -60,28 +79,36 @@ function startGame(){ sa = sh = 0; best = 0; newPoint(); state = 'playing'; msg 
 function human(){ const u = kUp || tUp, d = kDn || tDn; return u === d ? 1 : (u ? 0 : 2); }  // 위 0 / 정지 1 / 아래 2
 
 function tick(){
-  const r = step(e, aiAct(net, e, SIGMA[diff], rand), human(), HSPEED, ev);
+  const spec = mode === 'spec';
+  const r = step(e, aiAct(net, e, SIGMA[diff], rand, TR), spec ? aiActRight(net, e, SIGMA[diffR], rand) : human(), HSPEED, ev, spec);
   if (ev.aiHit || ev.rightHit) { rally++; best = Math.max(best, rally); }
   if (r) {
-    if (r === 2) { sa++; msg = 'AI 득점'; } else { sh++; msg = '득점! (AI가 놓쳤습니다)'; }
-    if (sa >= WIN || sh >= WIN) { state = 'over'; msg = (sh > sa ? '🎉 당신의 승리!' : 'AI 승리') + ' — Space로 다시'; }
+    if (r === 2) { sa++; msg = 'AI 득점'; } else { sh++; msg = mode === 'spec' ? '' : '득점! (AI가 놓쳤습니다)'; }
+    if (spec) { state = 'point'; pauseUntil = performance.now() + 500 / speed; msg = (r === 2 ? '왼쪽' : '오른쪽') + ' AI 득점'; }
+    else if (sa >= WIN || sh >= WIN) { state = 'over'; msg = (sh > sa ? '🎉 당신의 승리!' : 'AI 승리') + ' — Space로 다시'; }
     else { state = 'point'; pauseUntil = performance.now() + 900; }
   }
 }
 function loop(now){
   let dt = now - last; last = now; if (dt > 100) dt = 100;
-  if (state === 'playing') { acc += dt; while (acc >= TICK && state === 'playing') { tick(); acc -= TICK; } }
+  if (state === 'playing') { acc += dt * speed; while (acc >= TICK && state === 'playing') { tick(); acc -= TICK; } }
   else { acc = 0; if (state === 'point' && now >= pauseUntil) { newPoint(); msg = ''; state = 'playing'; } }
-  if (state === 'menu') msg = '난이도를 고르고 Space (또는 시작 버튼)';
-  draw(); requestAnimationFrame(loop);
+  if (state === 'menu') msg = mode === 'spec' ? '양쪽 난이도를 고르고 Space — 구경 시작' : '난이도를 고르고 Space (또는 시작 버튼)';
+  draw(); drawNN(); requestAnimationFrame(loop);
 }
 function setDiff(d){ diff = d; document.querySelectorAll('[data-d]').forEach(b => b.classList.toggle('on', +b.dataset.d === d)); if (state !== 'playing') { state = 'menu'; } }
 document.querySelectorAll('[data-d]').forEach(b => b.onclick = () => { setDiff(+b.dataset.d); b.blur(); });
+function setMode(m){ mode = m; state = 'menu'; document.querySelectorAll('[data-m]').forEach(b => b.classList.toggle('on', b.dataset.m === m));
+  document.getElementById('bar2').style.display = m === 'spec' ? 'flex' : 'none';
+  document.getElementById('lblL').textContent = m === 'spec' ? '왼쪽 AI 난이도' : '난이도'; document.getElementById('ttl').textContent = m === 'spec' ? '🏓 Pong DQN — AI vs AI 관전' : '🏓 Pong DQN — 신경망(왼쪽)과 대전, 당신은 오른쪽'; sa = sh = 0; best = 0; newPoint(); }
+document.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { setMode(b.dataset.m); b.blur(); });
+document.querySelectorAll('[data-r]').forEach(b => b.onclick = () => { diffR = +b.dataset.r; document.querySelectorAll('[data-r]').forEach(x => x.classList.toggle('on', x === b)); b.blur(); });
+document.querySelectorAll('[data-s]').forEach(b => b.onclick = () => { speed = +b.dataset.s; document.querySelectorAll('[data-s]').forEach(x => x.classList.toggle('on', x === b)); b.blur(); });
 document.getElementById('start').onclick = e2 => { startGame(); e2.target.blur(); };
 addEventListener('keydown', k => {
   if (k.code === 'ArrowUp' || k.code === 'KeyW') { kUp = true; k.preventDefault(); }
   else if (k.code === 'ArrowDown' || k.code === 'KeyS') { kDn = true; k.preventDefault(); }
-  else if (k.code === 'Space') { if (state !== 'playing' && state !== 'point') startGame(); k.preventDefault(); }
+  else if (k.code === 'Space') { if (mode === 'spec' || (state !== 'playing' && state !== 'point')) startGame(); k.preventDefault(); }
   else if (k.code === 'Digit1' || k.code === 'Digit2' || k.code === 'Digit3') setDiff(+k.key);
 });
 addEventListener('keyup', k => {
@@ -93,5 +120,56 @@ function hold(id, set){ const b = document.getElementById(id);
   b.addEventListener('pointerdown', ev2 => { set(true); b.setPointerCapture(ev2.pointerId); if (state !== 'playing' && state !== 'point') startGame(); });
   ['pointerup','pointercancel','lostpointercapture'].forEach(n => b.addEventListener(n, () => set(false))); }
 hold('up', v => tUp = v); hold('dn', v => tDn = v);
+
+/* ---------- 신경망 시각화 ---------- */
+const nn = document.getElementById('nn').getContext('2d'), wm = document.getElementById('wm').getContext('2d');
+const INAMES = ['공 x','공 y','공 vx','공 vy','내 패들 y','상대 패들 y','착지 예측 y'], ANAMES = ['▲ 위','■ 정지','▼ 아래'];
+let amax1 = 1, amax2 = 1;
+function heat(v, m){ const t = Math.min(1, Math.abs(v) / m), u = Math.pow(t, 0.7);
+  return v >= 0 ? `rgb(${Math.round(255*u)},${Math.round(140*u)},${Math.round(40*u)})` : `rgb(${Math.round(60*u)},${Math.round(140*u)},${Math.round(255*u)})`; }
+function grid(c, arr, x0, y0, cell, m){ for (let i = 0; i < 64; i++) { c.fillStyle = heat(arr[i], m); c.fillRect(x0 + (i % 8) * cell, y0 + Math.floor(i / 8) * cell, cell - 1, cell - 1); } }
+function arrow(c, x1, x2, y){ c.strokeStyle = '#3a4866'; c.fillStyle = '#3a4866'; c.beginPath(); c.moveTo(x1, y); c.lineTo(x2 - 6, y); c.stroke(); c.beginPath(); c.moveTo(x2, y); c.lineTo(x2 - 8, y - 5); c.lineTo(x2 - 8, y + 5); c.fill(); }
+function drawNN(){
+  const c = nn; c.fillStyle = '#05080e'; c.fillRect(0, 0, 900, 335); if (!TR.h1) return;
+  c.font = '12px system-ui'; c.textAlign = 'left';
+  // 입력
+  c.fillStyle = '#8a97b0'; c.fillText('입력 (7)', 10, 18);
+  for (let i = 0; i < 7; i++) { const y = 34 + i * 36, v = TR.s[i];
+    c.fillStyle = '#c9d4ea'; c.fillText(INAMES[i], 10, y + 4); c.fillText(v.toFixed(2), 150, y + 4);
+    c.fillStyle = '#16203a'; c.fillRect(196, y - 6, 64, 12); c.fillStyle = i === 6 ? '#ffb454' : '#5aa9ff';
+    const w = Math.max(-1, Math.min(1, v)) * 32; c.fillRect(228 + Math.min(0, w), y - 6, Math.abs(w), 12); c.fillStyle = '#3a4866'; c.fillRect(228, y - 8, 1, 16); }
+  arrow(c, 270, 315, 140);
+  // 은닉
+  let m1 = 0, m2 = 0, on1 = 0, on2 = 0; for (let i = 0; i < 64; i++) { m1 = Math.max(m1, TR.h1[i]); m2 = Math.max(m2, TR.h2[i]); on1 += TR.h1[i] > 0; on2 += TR.h2[i] > 0; }
+  amax1 = Math.max(amax1 * 0.99, m1, 0.5); amax2 = Math.max(amax2 * 0.99, m2, 0.5);
+  c.fillStyle = '#8a97b0'; c.fillText(`은닉1 (64) — 켜진 뉴런 ${on1}`, 320, 18); grid(c, TR.h1, 320, 34, 30, amax1);
+  arrow(c, 570, 615, 140);
+  c.fillStyle = '#8a97b0'; c.fillText(`은닉2 (64) — 켜진 뉴런 ${on2}`, 620, 18); grid(c, TR.h2, 620, 34, 30, amax2);
+  // 출력 (은닉2 격자 오른쪽 아래)
+  const q = TR.q; let a = 0; for (let i = 1; i < 3; i++) if (q[i] > q[a]) a = i;
+  const qm = Math.max(1, ...q.map(Math.abs));
+  c.fillStyle = '#8a97b0'; c.fillText('출력 Q값', 320, 300);
+  for (let i = 0; i < 3; i++) { const x = 360 + i * 170, w = Math.round(Math.abs(q[i]) / qm * 70);
+    c.fillStyle = i === a ? '#ffb454' : '#7d8cab'; c.fillText(`${ANAMES[i]}  ${q[i].toFixed(2)}`, x, 325);
+    c.fillStyle = i === a ? '#ffb454' : '#2b3a5a'; c.fillRect(x, 304, w, 8); }
+}
+(function drawWeights(){
+  const c = wm; c.fillStyle = '#05080e'; c.fillRect(0, 0, 900, 450); c.font = '12px system-ui'; c.textAlign = 'left';
+  const mats = [['W1 입력→은닉1', net.W1, 7, 64, 0, 3.1], ['W2 은닉1→은닉2 (64×64)', net.W2, 64, 64, 1, 2.1], ['W3 은닉2→Q', net.W3, 3, 64, 2, 1.0]];
+  const cw = [22, 6, 22], rh = 6, y0 = 54; let x = 12; const xs = [];
+  for (const [t, W, nc, nr, k, mx] of mats) { xs.push(x); c.fillStyle = '#8a97b0'; c.fillText(t, x, 18);
+    for (let r = 0; r < nr; r++) for (let j = 0; j < nc; j++) { c.fillStyle = heat(W[r * nc + j], mx); c.fillRect(x + j * cw[k], y0 + r * rh, cw[k] - (k === 1 ? 0 : 1), rh - 1 + (k === 1 ? 1 : 0)); }
+    if (k === 0) { c.save(); c.fillStyle = '#8a97b0'; c.font = '10px system-ui'; for (let j = 0; j < 7; j++) { c.save(); c.translate(x + j * 22 + 12, y0 - 4); c.rotate(-Math.PI / 4); c.fillText(INAMES[j], 0, 0); c.restore(); } c.restore(); }
+    if (k === 2) { c.fillStyle = '#8a97b0'; c.font = '10px system-ui'; for (let j = 0; j < 3; j++) c.fillText(['위','정지','아래'][j], x + j * 22 + 1, y0 - 6); }
+    x += nc * cw[k] + 30; }
+  // 입력별 영향력
+  const bx = 706; c.fillStyle = '#8a97b0'; c.font = '12px system-ui'; c.fillText('입력별 평균 |W1|', bx, 18); c.fillText('(첫 층 영향력)', bx, 34);
+  for (let j = 0; j < 7; j++) { let s = 0; for (let o = 0; o < 64; o++) s += Math.abs(net.W1[o * 7 + j]); s /= 64;
+    const y = 56 + j * 26; c.fillStyle = '#c9d4ea'; c.fillText(INAMES[j], bx, y + 4); c.fillStyle = j === 6 ? '#ffb454' : '#5aa9ff'; c.fillRect(bx + 74, y - 6, s * 80, 12); c.fillStyle = '#c9d4ea'; c.fillText(s.toFixed(2), bx + 78 + s * 80, y + 4); }
+  c.fillStyle = '#8a97b0'; c.font = '11px system-ui'; c.fillText('주황=양(+) 파랑=음(−) 검정=0', bx, 262);
+  c.fillText('가중치 448+4,096+192 = 4,736', bx, 284); c.fillText('편향 64+64+3 = 131', bx, 302); c.fillText('합계 4,867개', bx, 320);
+  const st = a => { let mn = 1e9, mx = -1e9, m = 0; for (const v of a) { mn = Math.min(mn, v); mx = Math.max(mx, v); m += v; } m /= a.length; let s = 0; for (const v of a) s += (v - m) ** 2; return `최소 ${mn.toFixed(2)} 최대 ${mx.toFixed(2)} 표준편차 ${Math.sqrt(s / a.length).toFixed(2)}`; };
+  document.getElementById('wstat').innerHTML = `W1 ${st(net.W1)}<br>W2 ${st(net.W2)}<br>W3 ${st(net.W3)}<br>색 스케일은 행렬마다 다릅니다(최대 절댓값 기준). 규칙 추적 상대와 300판 붙였을 때 은닉2 뉴런 중 거의 안 켜지는(&lt;1%) 것은 64개 중 13개였습니다(은닉1은 2개) — 이 상대·이 분포 기준 측정이며 쓸모없다는 뜻은 아닙니다.`;
+})();
 requestAnimationFrame(loop);
 </script></body></html>
