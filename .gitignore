@@ -6,3 +6,10 @@ best*.bin
 exp/
 nohup.out
 gradcheck_full
+pong_dqn_v2
+pong_dqn_v2_dbl
+select_model
+difficulty
+smoke*
+wandb/
+.venv/

@@ -1,0 +1,11 @@
+FINAL tag=L1m_s2 lr=0.0003 sync=1000 ddqn=0 in=6 steps=1000000 gamma=0.95 hit_r=0.30 seed=2  final_win=0.7560 final_hits=2.67  best_eval=0.969
+FINAL tag=L1m_s1 lr=0.0003 sync=1000 ddqn=0 in=6 steps=1000000 gamma=0.95 hit_r=0.30 seed=1  final_win=0.6450 final_hits=6.67  best_eval=0.935
+FINAL tag=PRED_s1 lr=0.0003 sync=1000 ddqn=0 in=7 steps=300000 gamma=0.95 hit_r=0.30 seed=1  final_win=0.6640 final_hits=3.46  best_eval=1.000
+FINAL tag=PRED_s2 lr=0.0003 sync=1000 ddqn=0 in=7 steps=300000 gamma=0.95 hit_r=0.30 seed=2  final_win=0.9116 final_hits=4.97  best_eval=0.977
+FINAL tag=LR1e4_s1 lr=0.0001 sync=1000 ddqn=0 in=6 steps=300000 gamma=0.95 hit_r=0.30 seed=1  final_win=0.7738 final_hits=4.82  best_eval=0.902
+FINAL tag=LR1e4_s2 lr=0.0001 sync=1000 ddqn=0 in=6 steps=300000 gamma=0.95 hit_r=0.30 seed=2  final_win=0.9344 final_hits=4.04  best_eval=0.960
+FINAL tag=DDQN_s1 lr=0.0003 sync=1000 ddqn=1 in=6 steps=300000 gamma=0.95 hit_r=0.30 seed=1  final_win=0.5694 final_hits=2.32  best_eval=0.960
+FINAL tag=DDQN_s2 lr=0.0003 sync=1000 ddqn=1 in=6 steps=300000 gamma=0.95 hit_r=0.30 seed=2  final_win=0.8088 final_hits=4.86  best_eval=0.954
+FINAL tag=SYNC3k_s1 lr=0.0003 sync=3000 ddqn=0 in=6 steps=300000 gamma=0.95 hit_r=0.30 seed=1  final_win=0.6722 final_hits=2.89  best_eval=0.912
+FINAL tag=SYNC3k_s2 lr=0.0003 sync=3000 ddqn=0 in=6 steps=300000 gamma=0.95 hit_r=0.30 seed=2  final_win=0.6208 final_hits=4.24  best_eval=0.947
+ALLDONE
