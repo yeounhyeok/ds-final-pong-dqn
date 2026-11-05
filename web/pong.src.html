@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Pong DQN — 신경망과 대전</title>
+<style>
+ html,body{margin:0;height:100%;background:#0b0f17;color:#dfe6f2;font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif;touch-action:none;-webkit-user-select:none;user-select:none}
+ #wrap{max-width:900px;margin:0 auto;padding:10px;box-sizing:border-box}
+ h1{font-size:17px;margin:4px 0 8px;font-weight:600}
+ #bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;font-size:14px}
+ .btn{background:#1b2536;border:1px solid #33425f;color:#dfe6f2;padding:7px 14px;border-radius:8px;font-size:14px;cursor:pointer}
+ .btn.on{background:#2f6fed;border-color:#2f6fed;color:#fff}
+ canvas{width:100%;background:#05080e;border:1px solid #28344d;border-radius:10px;display:block}
+ #pad{display:none;gap:10px;margin-top:10px}
+ #pad .btn{flex:1;font-size:26px;padding:22px 0}
+ @media (pointer:coarse){#pad{display:flex}}
+ #note{font-size:12px;color:#8a97b0;margin-top:8px;line-height:1.5}
+</style></head><body><div id="wrap">
+<h1>🏓 Pong DQN — 신경망(왼쪽)과 대전, 당신은 오른쪽</h1>
+<div id="bar">
+ 난이도
+ <button class="btn" data-d="1">초급</button><button class="btn" data-d="2">중급</button><button class="btn on" data-d="3">고급</button>
+ <button class="btn" id="start">시작 (Space)</button><span id="rank"></span>
+</div>
+<canvas id="c" width="900" height="520"></canvas>
+<div id="pad"><button class="btn" id="up">▲</button><button class="btn" id="dn">▼</button></div>
+<div id="note">조작: <b>↑/↓</b> 또는 <b>W/S</b> — 누르는 동안 이동, 떼면 멈춤 · 모바일은 아래 ▲▼ 버튼 · 먼저 7점<br>
+난이도는 같은 모델의 입력(공 착지 예측)에 오차 σ를 섞어 만듭니다 (초급 0.30 / 중급 0.15 / 고급 0). 규칙 기반 상대 대비 승률은 각각 약 29% / 69% / 99.9% 이며, 사람 상대 난이도는 측정하지 않았습니다.</div>
+</div>
+<script>__CORE__</script>
+<script>
+const MODEL_B64 = "__MODEL_B64__";
+const bin = Uint8Array.from(atob(MODEL_B64), c => c.charCodeAt(0));
+const net = parseNet(bin.buffer);
+const cv = document.getElementById('c'), g = cv.getContext('2d'), W = cv.width, Hh = cv.height;
+const WIN = 7, TICK = 30, HSPEED = PADDLE_SPEED;   // 30ms/틱 = 터미널판과 동일, 사람 속도 = AI 속도
+const M = 18, PW = 14;                              // 좌우 여백, 패들 두께
+const rand = Math.random;
+let diff = 3, state = 'menu', e = envReset(rand), sa = 0, sh = 0, rally = 0, best = 0, msg = '', pauseUntil = 0, acc = 0, last = performance.now();
+let kUp = false, kDn = false, tUp = false, tDn = false;
+const ev = {};
+
+function toX(bx){ return M + PW + bx * (W - 2*(M+PW)); }
+function toY(by){ return by * Hh; }
+function draw(){
+  g.fillStyle = '#05080e'; g.fillRect(0,0,W,Hh);
+  g.strokeStyle = '#26324a'; g.setLineDash([10,12]); g.beginPath(); g.moveTo(W/2,0); g.lineTo(W/2,Hh); g.stroke(); g.setLineDash([]);
+  const ph = 2*PADDLE_HALF*Hh;
+  g.fillStyle = '#5aa9ff'; g.fillRect(M, toY(e.py)-ph/2, PW, ph);
+  g.fillStyle = '#ffb454'; g.fillRect(W-M-PW, toY(e.oy)-ph/2, PW, ph);
+  g.fillStyle = '#fff'; g.beginPath(); g.arc(toX(e.bx), toY(e.by), 8, 0, 7); g.fill();
+  g.fillStyle = '#8fb8ff'; g.font = '600 34px system-ui'; g.textAlign = 'center';
+  g.fillText(sa, W/2 - 60, 46); g.fillStyle = '#ffc77d'; g.fillText(sh, W/2 + 60, 46);
+  g.font = '13px system-ui'; g.fillStyle = '#8a97b0';
+  g.fillText('AI (σ=' + SIGMA[diff].toFixed(2) + ')', W/4, 22); g.fillText('YOU', 3*W/4, 22);
+  g.fillText('랠리 ' + rally + ' · 최고 ' + best, W/2, Hh - 12);
+  if (msg) { g.fillStyle = '#fff'; g.font = '600 26px system-ui'; g.fillText(msg, W/2, Hh/2 - 10); }
+}
+function newPoint(){ e = envReset(rand); rally = 0; }
+function startGame(){ sa = sh = 0; best = 0; newPoint(); state = 'playing'; msg = ''; }
+function human(){ const u = kUp || tUp, d = kDn || tDn; return u === d ? 1 : (u ? 0 : 2); }  // 위 0 / 정지 1 / 아래 2
+
+function tick(){
+  const r = step(e, aiAct(net, e, SIGMA[diff], rand), human(), HSPEED, ev);
+  if (ev.aiHit || ev.rightHit) { rally++; best = Math.max(best, rally); }
+  if (r) {
+    if (r === 2) { sa++; msg = 'AI 득점'; } else { sh++; msg = '득점! (AI가 놓쳤습니다)'; }
+    if (sa >= WIN || sh >= WIN) { state = 'over'; msg = (sh > sa ? '🎉 당신의 승리!' : 'AI 승리') + ' — Space로 다시'; }
+    else { state = 'point'; pauseUntil = performance.now() + 900; }
+  }
+}
+function loop(now){
+  let dt = now - last; last = now; if (dt > 100) dt = 100;
+  if (state === 'playing') { acc += dt; while (acc >= TICK && state === 'playing') { tick(); acc -= TICK; } }
+  else { acc = 0; if (state === 'point' && now >= pauseUntil) { newPoint(); msg = ''; state = 'playing'; } }
+  if (state === 'menu') msg = '난이도를 고르고 Space (또는 시작 버튼)';
+  draw(); requestAnimationFrame(loop);
+}
+function setDiff(d){ diff = d; document.querySelectorAll('[data-d]').forEach(b => b.classList.toggle('on', +b.dataset.d === d)); if (state !== 'playing') { state = 'menu'; } }
+document.querySelectorAll('[data-d]').forEach(b => b.onclick = () => { setDiff(+b.dataset.d); b.blur(); });
+document.getElementById('start').onclick = e2 => { startGame(); e2.target.blur(); };
+addEventListener('keydown', k => {
+  if (k.code === 'ArrowUp' || k.code === 'KeyW') { kUp = true; k.preventDefault(); }
+  else if (k.code === 'ArrowDown' || k.code === 'KeyS') { kDn = true; k.preventDefault(); }
+  else if (k.code === 'Space') { if (state !== 'playing' && state !== 'point') startGame(); k.preventDefault(); }
+  else if (k.code === 'Digit1' || k.code === 'Digit2' || k.code === 'Digit3') setDiff(+k.key);
+});
+addEventListener('keyup', k => {
+  if (k.code === 'ArrowUp' || k.code === 'KeyW') kUp = false;
+  if (k.code === 'ArrowDown' || k.code === 'KeyS') kDn = false;
+});
+addEventListener('blur', () => { kUp = kDn = tUp = tDn = false; });       // 창을 벗어나면 멈춤
+function hold(id, set){ const b = document.getElementById(id);
+  b.addEventListener('pointerdown', ev2 => { set(true); b.setPointerCapture(ev2.pointerId); if (state !== 'playing' && state !== 'point') startGame(); });
+  ['pointerup','pointercancel','lostpointercapture'].forEach(n => b.addEventListener(n, () => set(false))); }
+hold('up', v => tUp = v); hold('dn', v => tDn = v);
+requestAnimationFrame(loop);
+</script></body></html>

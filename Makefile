@@ -16,3 +16,7 @@ select-model: tools/select_model.c pong_dqn_v2.c
 	gcc -O2 -DPRED -o select_model tools/select_model.c -lm
 difficulty: tools/difficulty.c pong_dqn_v2.c
 	gcc -O2 -DPRED -o difficulty tools/difficulty.c -lm && ./difficulty
+
+# ---- 터미널 대전: ./play [1|2|3] ----
+play: play.c pong_dqn_v2.c
+	gcc -O2 -Wall -DPRED -o $@ play.c -lm
