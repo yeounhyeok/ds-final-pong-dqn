@@ -14,3 +14,6 @@ smoke*
 wandb/
 .venv/
 play
+ranking_test
+ranking.txt
+*.exe

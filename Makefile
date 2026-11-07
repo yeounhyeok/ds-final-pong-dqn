@@ -18,5 +18,9 @@ difficulty: tools/difficulty.c pong_dqn_v2.c
 	gcc -O2 -DPRED -o difficulty tools/difficulty.c -lm && ./difficulty
 
 # ---- 터미널 대전: ./play [1|2|3] ----
-play: play.c pong_dqn_v2.c
-	gcc -O2 -Wall -DPRED -o $@ play.c -lm
+play: play.c pong_dqn_v2.c ranking.c ranking.h
+	gcc -O2 -Wall -DPRED -o $@ play.c ranking.c -lm
+
+# ---- 랭킹 TOP 10 모듈 테스트 ----
+ranking-test: tools/ranking_test.c ranking.c ranking.h
+	gcc -O2 -Wall -Wextra -o ranking_test tools/ranking_test.c ranking.c && ./ranking_test

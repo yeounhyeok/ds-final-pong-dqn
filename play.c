@@ -13,6 +13,7 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <time.h>
+#include "ranking.h"
 
 #define COLS 61
 #define ROWS 21
@@ -144,7 +145,7 @@ int main(int argc, char **argv)
     if (!isatty(0)) { fprintf(stderr, "대화형 터미널에서 실행해 주세요.\n"); return 1; }
     tty_raw();
     int HOLD0 = getenv("HOLD0") ? atoi(getenv("HOLD0")) : 6, HOLD = getenv("HOLD") ? atoi(getenv("HOLD")) : 3;
-    int sa = 0, sh = 0, dir = 1, hold = 0, quit = 0;
+    int sa = 0, sh = 0, dir = 1, hold = 0, quit = 0, hits_h = 0;   /* hits_h: 사람이 받아친 횟수 (랭킹 점수용) */
     Env e;  env_reset(&e);
     char msg[128] = "준비... 키를 누르는 동안 패들이 움직입니다";
     draw(&e, sa, sh, msg, diff);
@@ -160,7 +161,9 @@ int main(int argc, char **argv)
                 if (read(0, &b[0], 1) == 1 && b[0] == '[' && read(0, &b[1], 1) == 1) { if (b[1] == 'A' || b[1] == 'B') { hold = hold > 0 ? HOLD : HOLD0;  dir = b[1] == 'A' ? 0 : 2; } }
             }
         }
+        REAL pvx = e.bvx;
         int hit, r = step2(&e, ai_act(&net, &e, sigma), hold > 0 ? dir : 1, hspeed, &hit);
+        if (!r && pvx > 0 && e.bvx < 0) hits_h++;        /* 오른쪽으로 가던 공이 되돌아옴 = 사람이 받아침 */
         if (hold > 0) hold--;
         if (r) {
             if (r == 2) { sa++; snprintf(msg, sizeof msg, "AI 득점!"); } else { sh++; snprintf(msg, sizeof msg, "득점! (AI 가 놓쳤습니다)"); }
@@ -171,6 +174,15 @@ int main(int argc, char **argv)
         draw(&e, sa, sh, msg, diff);
         usleep(TICK_US);
     }
-    if (!quit) { draw(&e, sa, sh, sa > sh ? "AI 승리!  다시 하려면 ./play" : "당신의 승리!  다시 하려면 ./play", diff); }
+    if (!quit) {
+        draw(&e, sa, sh, sa > sh ? "AI 승리!" : "당신의 승리!", diff);
+        usleep(1200000);
+        /* 랭킹: 이름을 일반 입력으로 받아야 하므로 터미널을 원래 모드(블로킹·에코)로 되돌리고 남은 키 입력을 버린다 */
+        tty_restore();
+        fcntl(0, F_SETFL, fcntl(0, F_GETFL) & ~O_NONBLOCK);
+        tcflush(0, TCIFLUSH);
+        rank_after_game(RANK_FILE, sh, sa, hits_h, diff);
+        printf("\n  다시 하려면 ./play\n");
+    }
     return 0;
 }
