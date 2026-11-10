@@ -1,4 +1,5 @@
 pong_dqn
+pong_game
 pong_dqn_dbl
 *.log
 train_log*.csv
@@ -13,7 +14,7 @@ difficulty
 smoke*
 wandb/
 .venv/
-play
 ranking_test
 ranking.txt
 *.exe
+.claude/settings.local.json
