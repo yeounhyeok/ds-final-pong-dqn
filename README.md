@@ -37,4 +37,24 @@ make game && ./pong_game
 - 경기가 끝나면 `ranking.c` 로 점수 계산 → TOP 10 이면 이름 입력 → `ranking.txt` 저장. 중간에 나가면 기록 안 됨
 - 파일 구성
   - `pong_core.h` — 게임 로직 (`pong_dqn_v2.c` include, 난이도·물리·받아침 집계·랭킹 점수)
-  - `pong_game.c` — 터미널 UI (ANSI + termios). 터미널은 키를 뗀 순간을 알 수 없어 '키 반복이 끊기면 정지'
+  - `pong_game.c` — 터미널 UI (ANSI + 입력 처리: 리눅스는 termios, 윈도우는 콘솔 API). 터미널은 키를 뗀 순간을 알 수 없어 '키 반복이 끊기면 정지'
+
+## Windows 에서 실행
+`pong_game.c` 의 `#ifdef _WIN32` 부분이 윈도우 콘솔(키 입력·한글 출력·ANSI 색)을 처리한다. 리눅스/맥은 위의 `make game && ./pong_game` 그대로.
+
+필요: Windows 10 이상, gcc (MinGW-w64), 콘솔 창 크기 가로 64칸 · 세로 16줄 이상
+
+1. **exe 실행** — 소스 zip 에 들어 있는 `pong_game.exe` 를 터미널(PowerShell / Windows Terminal)에서 실행
+   ```
+   .\pong_game.exe
+   ```
+   `models\final_model.bin` 이 실행 위치 기준으로 있어야 한다. 더블클릭하면 창이 바로 닫힐 수 있다.
+2. **VS Code 에서 F5** — 이 폴더를 `폴더 열기`로 열고 (C/C++ 확장 + gcc 가 PATH 에 필요) `pong_game.c` 를 연 채로 F5.
+   `.vscode/tasks.json` 이 빌드하고, `.vscode/launch.json` 이 VS Code 아래 터미널에서 `pong_game.exe` 를 실행한다.
+   gdb 로 디버깅하는 설정도 있지만 경로에 한글이 있으면 gdb 가 시작하지 못한다(영문 경로에서만 사용).
+3. **직접 빌드**
+   ```
+   gcc -O2 -Wall -DPRED -o pong_game.exe pong_game.c ranking.c -lm
+   ```
+   ※ Visual Studio(MSVC) 빌드는 확인하지 못했다.
+

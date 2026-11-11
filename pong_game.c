@@ -13,10 +13,23 @@
  */
 #include <stdarg.h>
 #include <signal.h>
+#ifdef _WIN32
+#include <windows.h>
+#include <io.h>
+#undef IN                       /* windows.h 의 빈 매크로 IN/OUT 이 모델 상수(IN, OUT)와 겹친다 */
+#undef OUT
+#define STDIN_FILENO  0
+#define STDOUT_FILENO 1
+#define isatty _isatty
+#ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
+#define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
+#endif
+#else
 #include <termios.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>
+#endif
 
 #include "pong_core.h"
 
@@ -28,6 +41,7 @@
 
 /* ================= 1. 터미널 제어 ================= */
 
+#ifndef _WIN32
 static struct termios term_orig;
 static int term_raw = 0;
 static volatile sig_atomic_t quit_flag = 0;
@@ -84,6 +98,138 @@ static void sleep_sec(double d)
     nanosleep(&ts, NULL);
 }
 
+/* 키 입력 기본 함수 (POSIX): 기다리지 않고 읽기 / 최대 sec 초 기다리기 / 쌓인 입력 버리기 */
+static int in_getc(unsigned char *c) { return read(STDIN_FILENO, c, 1) == 1; }
+static int in_read_n(unsigned char *b, int n) { ssize_t r = read(STDIN_FILENO, b, n);  return r < 0 ? 0 : (int)r; }
+static int in_wait(double sec)
+{
+    fd_set fs;  FD_ZERO(&fs);  FD_SET(STDIN_FILENO, &fs);
+    struct timeval tv = { (long)sec, (long)((sec - (long)sec) * 1e6) };
+    return select(STDIN_FILENO + 1, &fs, NULL, NULL, &tv) > 0;
+}
+static void in_flush(void) { tcflush(STDIN_FILENO, TCIFLUSH); }
+#else
+static int term_raw = 0;
+static volatile sig_atomic_t quit_flag = 0;
+
+/* ---- Windows 콘솔: 입력 이벤트를 UTF-8 바이트 열로 바꿔 리눅스 판과 같은 방식으로 처리한다 ---- */
+static HANDLE hin, hout;
+static DWORD in_mode0, out_mode0;
+static UINT cp0;
+static unsigned char ibuf[512];
+static int ihead, itail;
+
+static void ipush(unsigned char c) { int nx = (itail + 1) % (int)sizeof ibuf;  if (nx != ihead) { ibuf[itail] = c;  itail = nx; } }
+static void ipush_utf8(unsigned cp)
+{
+    if (cp < 0x80) ipush((unsigned char)cp);
+    else if (cp < 0x800) { ipush(0xC0 | (cp >> 6));  ipush(0x80 | (cp & 0x3F)); }
+    else if (cp < 0x10000) { ipush(0xE0 | (cp >> 12));  ipush(0x80 | ((cp >> 6) & 0x3F));  ipush(0x80 | (cp & 0x3F)); }
+    else { ipush(0xF0 | (cp >> 18));  ipush(0x80 | ((cp >> 12) & 0x3F));  ipush(0x80 | ((cp >> 6) & 0x3F));  ipush(0x80 | (cp & 0x3F)); }
+}
+static void ipump(void)                                    /* 콘솔에 쌓인 키 이벤트를 바이트 버퍼로 옮긴다 */
+{
+    static unsigned hi = 0;
+    INPUT_RECORD r;  DWORD n;
+    for (;;) {
+        if (!GetNumberOfConsoleInputEvents(hin, &n) || n == 0) break;
+        if (!ReadConsoleInputW(hin, &r, 1, &n) || n == 0) break;
+        if (r.EventType != KEY_EVENT || !r.Event.KeyEvent.bKeyDown) continue;
+        WORD vk = r.Event.KeyEvent.wVirtualKeyCode;
+        unsigned ch = r.Event.KeyEvent.uChar.UnicodeChar;
+        if (ch == 0) {                                     /* 방향키 -> ESC [ A/B/C/D */
+            char c = vk == VK_UP ? 'A' : vk == VK_DOWN ? 'B' : vk == VK_RIGHT ? 'C' : vk == VK_LEFT ? 'D' : 0;
+            if (c) { ipush(0x1b);  ipush('[');  ipush((unsigned char)c); }
+            continue;
+        }
+        if (ch >= 0xD800 && ch <= 0xDBFF) { hi = ch;  continue; }          /* 서로게이트 쌍 */
+        if (ch >= 0xDC00 && ch <= 0xDFFF) { if (!hi) continue;  ch = 0x10000 + ((hi - 0xD800) << 10) + (ch - 0xDC00); }
+        hi = 0;
+        ipush_utf8(ch);
+    }
+}
+static int in_getc(unsigned char *c)
+{
+    ipump();
+    if (ihead == itail) return 0;
+    *c = ibuf[ihead];  ihead = (ihead + 1) % (int)sizeof ibuf;  return 1;
+}
+static int in_read_n(unsigned char *b, int n)
+{
+    int k = 0;
+    while (k < n && in_getc(&b[k])) k++;
+    return k;
+}
+static double now(void)
+{
+    LARGE_INTEGER f, t;
+    QueryPerformanceFrequency(&f);  QueryPerformanceCounter(&t);
+    return (double)t.QuadPart / (double)f.QuadPart;
+}
+static int in_wait(double sec)
+{
+    double end = now() + sec;
+    for (;;) {
+        ipump();
+        if (ihead != itail) return 1;
+        double left = end - now();
+        if (left <= 0) return 0;
+        WaitForSingleObject(hin, (DWORD)(left * 1000.0 + 0.5));
+    }
+}
+static void in_flush(void) { FlushConsoleInputBuffer(hin);  ihead = itail = 0; }
+
+static void term_mode(int raw)
+{
+    if (raw) {
+        SetConsoleMode(hin, (in_mode0 & ~(DWORD)(ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT | ENABLE_QUICK_EDIT_MODE)) | ENABLE_EXTENDED_FLAGS);
+        fputs("\x1b[?25l\x1b[2J", stdout);
+    } else {
+        SetConsoleMode(hin, in_mode0);
+        fputs("\x1b[?25h\x1b[H\x1b[2J", stdout);
+    }
+    fflush(stdout);
+}
+static void term_restore(void)
+{
+    if (!term_raw) return;
+    fputs("\x1b[0m\x1b[?25h\x1b[?1049l", stdout);
+    fflush(stdout);
+    SetConsoleMode(hin, in_mode0);  SetConsoleMode(hout, out_mode0);  SetConsoleOutputCP(cp0);
+    term_raw = 0;
+}
+static void on_signal(int sig) { (void)sig;  quit_flag = 1; }
+static void term_init(void)
+{
+    hin = GetStdHandle(STD_INPUT_HANDLE);  hout = GetStdHandle(STD_OUTPUT_HANDLE);
+    GetConsoleMode(hin, &in_mode0);  GetConsoleMode(hout, &out_mode0);  cp0 = GetConsoleOutputCP();
+    SetConsoleOutputCP(CP_UTF8);                                           /* 한글 출력 */
+    SetConsoleMode(hout, out_mode0 | ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING);   /* ANSI 색·커서 제어 */
+    term_raw = 1;
+    atexit(term_restore);
+    signal(SIGINT, on_signal);  signal(SIGTERM, on_signal);
+    fputs("\x1b[?1049h", stdout);
+    term_mode(1);
+}
+static void term_size(int *cols, int *rows)
+{
+    CONSOLE_SCREEN_BUFFER_INFO ci;
+    if (GetConsoleScreenBufferInfo(hout, &ci)) { *cols = ci.srWindow.Right - ci.srWindow.Left + 1;  *rows = ci.srWindow.Bottom - ci.srWindow.Top + 1; }
+    else { *cols = 80;  *rows = 24; }
+}
+static void sleep_sec(double d)
+{
+    if (d <= 0) return;
+    static HANDLE tm = NULL;                               /* 고해상도 타이머 (Windows 10 1803+), 없으면 Sleep */
+    if (!tm) tm = CreateWaitableTimerExW(NULL, NULL, 0x00000002 /*HIGH_RESOLUTION*/, TIMER_ALL_ACCESS);
+    if (tm) {
+        LARGE_INTEGER due;  due.QuadPart = -(LONGLONG)(d * 1e7);
+        if (SetWaitableTimer(tm, &due, 0, NULL, NULL, FALSE)) { WaitForSingleObject(tm, INFINITE);  return; }
+    }
+    Sleep((DWORD)(d * 1000.0 + 0.5));
+}
+#endif
+
 
 /* ================= 2. 키 입력 ================= */
 
@@ -94,15 +240,15 @@ enum { K_UP = 1000, K_DOWN, K_LEFT, K_RIGHT, K_ENTER, K_ESC };
 static int read_key(void)
 {
     unsigned char c, b[2];
-    if (read(STDIN_FILENO, &c, 1) != 1) return 0;
+    if (!in_getc(&c)) return 0;
     if (c == 0x1b) {                                         /* ESC [ A/B/C/D */
-        ssize_t n = read(STDIN_FILENO, b, 2);
+        int n = in_read_n(b, 2);
         if (n <= 0) return K_ESC;                            /* ESC 단독 */
         if (n < 2 || (b[0] != '[' && b[0] != 'O')) return 0;
         return b[1] == 'A' ? K_UP : b[1] == 'B' ? K_DOWN : b[1] == 'C' ? K_RIGHT : b[1] == 'D' ? K_LEFT : 0;
     }
     if (c == 0xE3) {                                         /* 한글 자모 (UTF-8 3바이트) */
-        if (read(STDIN_FILENO, b, 2) != 2) return 0;
+        if (in_read_n(b, 2) != 2) return 0;
         if (b[0] == 0x85 && b[1] == 0x88) return K_UP;       /* ㅈ */
         if (b[0] == 0x84 && b[1] == 0xB4) return K_DOWN;     /* ㄴ */
         if (b[0] == 0x85 && b[1] == 0x81) return K_LEFT;     /* ㅁ */
@@ -118,9 +264,7 @@ static int read_key(void)
 /* 최대 sec 초 동안 키를 기다린다 (메뉴용: 시간이 지나면 0 -> 다시 그리기, 창 크기 변경 반영) */
 static int wait_key(double sec)
 {
-    fd_set fs;  FD_ZERO(&fs);  FD_SET(STDIN_FILENO, &fs);
-    struct timeval tv = { (long)sec, (long)((sec - (long)sec) * 1e6) };
-    if (select(STDIN_FILENO + 1, &fs, NULL, NULL, &tv) <= 0) return 0;
+    if (!in_wait(sec)) return 0;
     return read_key();
 }
 
@@ -148,7 +292,7 @@ static void flush_out(void)
 {
     ap("\x1b[J");                                          /* 남은 아래쪽 지우기 */
     for (size_t i = 0; i < outn; ) {
-        ssize_t n = write(STDOUT_FILENO, out + i, outn - i);
+        long n = (long)write(STDOUT_FILENO, out + i, (unsigned)(outn - i));
         if (n <= 0) break;
         i += n;
     }
@@ -505,21 +649,19 @@ static int name_input(Result *R)
 {
     for (;;) {
         draw_name_input(R);
-        fd_set fs;  FD_ZERO(&fs);  FD_SET(STDIN_FILENO, &fs);
-        struct timeval tv = { 0, 250000 };                 /* 시간이 지나면 다시 그리기 (창 크기 변경 반영) */
-        int sel = select(STDIN_FILENO + 1, &fs, NULL, NULL, &tv);
+        int sel = in_wait(0.25);                           /* 시간이 지나면 다시 그리기 (창 크기 변경 반영) */
         if (quit_flag) return 0;
-        if (sel <= 0) continue;
+        if (!sel) continue;
 
         unsigned char c, b[8];
-        if (read(STDIN_FILENO, &c, 1) != 1) continue;
+        if (!in_getc(&c)) continue;
         size_t len = strlen(R->name);
         R->full = 0;
 
         if (c == '\r' || c == '\n') return 1;
         if (c == 0x7f || c == 0x08) { name_backspace(R->name);  continue; }
         if (c == 0x15) { R->name[0] = 0;  continue; }      /* Ctrl+U: 전부 지우기 */
-        if (c == 0x1b) { if (read(STDIN_FILENO, b, sizeof b) < 0) { }  continue; }   /* 방향키 등은 버림 */
+        if (c == 0x1b) { in_read_n(b, sizeof b);  continue; }   /* 방향키 등은 버림 */
 
         int n = c >= 0x20 && c < 0x7f ? 1 : c >= 0xC2 && c <= 0xDF ? 2 : c >= 0xE0 && c <= 0xEF ? 3
               : c >= 0xF0 && c <= 0xF4 ? 4 : 0;
@@ -527,9 +669,7 @@ static int name_input(Result *R)
         b[0] = c == ' ' ? '_' : c;                         /* 파일 형식상 공백 불가 -> 보이는 그대로 '_' */
         int ok = 1;
         for (int i = 1; i < n; i++) {                      /* 나머지 바이트 (보통 이미 와 있음) */
-            FD_ZERO(&fs);  FD_SET(STDIN_FILENO, &fs);
-            struct timeval t2 = { 0, 50000 };
-            if (select(STDIN_FILENO + 1, &fs, NULL, NULL, &t2) <= 0 || read(STDIN_FILENO, &b[i], 1) != 1
+            if (!in_wait(0.05) || !in_getc(&b[i])
                 || (b[i] & 0xC0) != 0x80) { ok = 0;  break; }
         }
         if (!ok) continue;
@@ -596,7 +736,7 @@ static void ranking_screen(const Game *g)
     R.qualifies = rank_qualifies(&R.rk, R.score);
     while (R.expect < R.rk.n && R.rk.e[R.expect].score >= R.score) R.expect++;   /* 동점이면 기존 기록이 위 */
 
-    tcflush(STDIN_FILENO, TCIFLUSH);                       /* 경기 중 쌓인 키 입력 버림 */
+    in_flush();                                            /* 경기 중 쌓인 키 입력 버림 */
     fputs("\x1b[2J", stdout);  fflush(stdout);
 
     if (R.qualifies) {

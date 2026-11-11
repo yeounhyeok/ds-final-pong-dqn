@@ -1,0 +1,26 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Pong 실행 (F5)",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": ".\\pong_game.exe",
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "Pong 빌드 (gcc)"
+        },
+        {
+            "name": "Pong 디버그 (gdb, 영문 경로에서만)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/pong_game.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": true,
+            "MIMode": "gdb",
+            "preLaunchTask": "Pong 빌드 (gcc)"
+        }
+    ]
+}
